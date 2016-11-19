@@ -7,14 +7,13 @@ pkgver="7.0.0_r1"
 
 clone() {
 	printf "(*) cloning %s...\\n" "$(basename $1)"
-	git clone -b "android-$droidversion" "$1" || exit 1
+	git clone -b "android-$pkgver" "$1" || exit 1
 }
 
 ## first we clone google's git repos...
-clone https://android.googlesource.com/platform/system/core
-clone https://android.googlesource.com/platform/system/extras
-clone https://android.googlesource.com/platform/external/f2fs-tools
-clone https://android.googlesource.com/platform/external/libselinux
+clone "https://android.googlesource.com/platform/system/core"
+clone "https://android.googlesource.com/platform/system/extras"
+clone "https://android.googlesource.com/platform/external/libselinux"
 
 
 ## if that went well, we apply the patches...
