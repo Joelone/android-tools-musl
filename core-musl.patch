@@ -1,0 +1,193 @@
+diff --git a/core/adb/core/diagnose_usb.cpp b/adb/diagnose_usb.cpp
+index 0f067b0..8934054 100644
+--- a/core/adb/core/diagnose_usb.cpp
++++ b/core/adb/diagnose_usb.cpp
+@@ -46,7 +46,7 @@ static const char* GetUdevProblem() {
+ 
+     // getgroups(2) indicates that the group_member() may not check the egid so we check it
+     // additionally just to be sure.
+-    if (group_member(plugdev_group->gr_gid) || getegid() == plugdev_group->gr_gid) {
++    if (getegid() == plugdev_group->gr_gid) {
+         // The user is in plugdev so the problem is likely with the udev rules.
+         return "verify udev rules";
+     }
+diff --git a/core/adb/core/sysdeps.h b/adb/sysdeps.h
+index 75dcc86..867f3ec 100644
+--- a/core/adb/core/sysdeps.h
++++ b/core/adb/sysdeps.h
+@@ -25,6 +25,7 @@
+ #endif
+ 
+ #include <errno.h>
++#include <sys/syscall.h>
+ 
+ #include <string>
+ #include <vector>
+@@ -831,7 +832,16 @@ static __inline__ int adb_is_absolute_host_path(const char* path) {
+ 
+ static __inline__ unsigned long adb_thread_id()
+ {
+-    return (unsigned long)gettid();
++  // TODO: this function should be merged with GetThreadId
++#if defined(__BIONIC__)
++  return gettid();
++#elif defined(__APPLE__)
++  return syscall(SYS_thread_selfid);
++#elif defined(__linux__)
++  return syscall(__NR_gettid);
++#elif defined(_WIN32)
++  return GetCurrentThreadId();
++#endif
+ }
+ 
+ #endif /* !_WIN32 */
+diff --git a/core/base/errors_unix.cpp b/core/base/errors_unix.cpp
+index 296995e..48269b6 100644
+--- a/core/base/errors_unix.cpp
++++ b/core/base/errors_unix.cpp
+@@ -17,6 +17,7 @@
+ #include "android-base/errors.h"
+ 
+ #include <errno.h>
++#include <string.h>
+ 
+ namespace android {
+ namespace base {
+diff --git a/core/base/file.cpp b/core/base/file.cpp
+index da1adba..59e7948 100644
+--- a/core/base/file.cpp
++++ b/core/base/file.cpp
+@@ -20,6 +20,7 @@
+ #include <fcntl.h>
+ #include <sys/stat.h>
+ #include <sys/types.h>
++#include <string.h>
+ 
+ #include <string>
+ 
+@@ -29,6 +30,11 @@
+ #include "cutils/log.h"
+ #include "utils/Compat.h"
+ 
++// musl does not have its own DEFFILEMODE macro so we define it here.
++#if !defined(DEFFILEMODE)
++#define DEFFILEMODE (S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH) /* 0666 */
++#endif
++
+ namespace android {
+ namespace base {
+ 
+diff --git a/core/base/logging.cpp b/core/base/logging.cpp
+index 1741871..e731e03 100644
+--- a/core/base/logging.cpp
++++ b/core/base/logging.cpp
+@@ -21,11 +21,12 @@
+ #include "android-base/logging.h"
+ 
+ #include <libgen.h>
++#include <string.h>
+ 
+ // For getprogname(3) or program_invocation_short_name.
+ #if defined(__ANDROID__) || defined(__APPLE__)
+ #include <stdlib.h>
+-#elif defined(__GLIBC__)
++#elif defined(_GNU_SOURCE)
+ #include <errno.h>
+ #endif
+ 
+@@ -91,7 +92,7 @@ namespace {
+ using std::mutex;
+ using std::lock_guard;
+ 
+-#if defined(__GLIBC__)
++#if defined(_GNU_SOURCE)
+ const char* getprogname() {
+   return program_invocation_short_name;
+ }
+diff --git a/core/fastboot/socket.cpp b/core/fastboot/socket.cpp
+index 14ecd93..de5f132 100644
+--- a/core/fastboot/socket.cpp
++++ b/core/fastboot/socket.cpp
+@@ -26,6 +26,7 @@
+  * SUCH DAMAGE.
+  */
+ 
++#include <sys/select.h>
+ #include "socket.h"
+ 
+ #include <android-base/errors.h>
+diff --git a/core/include/private/android_filesystem_config.h b/core/include/private/android_filesystem_config.h
+index c220a0c..86a2f72 100644
+--- a/core/include/private/android_filesystem_config.h
++++ b/core/include/private/android_filesystem_config.h
+@@ -22,7 +22,6 @@
+ #ifndef _ANDROID_FILESYSTEM_CONFIG_H_
+ #define _ANDROID_FILESYSTEM_CONFIG_H_
+ 
+-#include <sys/cdefs.h>
+ #include <sys/types.h>
+ #include <stdint.h>
+ 
+@@ -230,7 +229,9 @@ struct fs_path_config {
+ 
+ /* Rules for directories and files has moved to system/code/libcutils/fs_config.c */
+ 
+-__BEGIN_DECLS
++#if defined(__cplusplus)
++extern "C" {
++#endif
+ 
+ /*
+  * Used in:
+@@ -247,7 +248,9 @@ void fs_config(const char *path, int dir, const char *target_out_path,
+ 
+ ssize_t fs_config_generate(char *buffer, size_t length, const struct fs_path_config *pc);
+ 
+-__END_DECLS
++#if defined(__cplusplus)
++}
++#endif
+ 
+ #endif
+ #endif
+diff --git a/core/include/ziparchive/zip_archive.h b/core/include/ziparchive/zip_archive.h
+index 7dc60ae..e131ee3 100644
+--- a/core/include/ziparchive/zip_archive.h
++++ b/core/include/ziparchive/zip_archive.h
+@@ -22,11 +22,12 @@
+ 
+ #include <stdint.h>
+ #include <string.h>
+-#include <sys/cdefs.h>
+ #include <sys/types.h>
+ #include <utils/Compat.h>
+ 
+-__BEGIN_DECLS
++#if defined(__cplusplus)
++extern "C" {
++#endif
+ 
+ /* Zip compression methods we support */
+ enum {
+@@ -215,6 +216,8 @@ int GetFileDescriptor(const ZipArchiveHandle handle);
+ 
+ const char* ErrorCodeString(int32_t error_code);
+ 
+-__END_DECLS
++#if defined(__cplusplus)
++}
++#endif
+ 
+ #endif  // LIBZIPARCHIVE_ZIPARCHIVE_H_
+diff --git a/core/liblog/log_portability.h b/core/liblog/log_portability.h
+index 3ad2060..2b859c4 100644
+--- a/core/liblog/log_portability.h
++++ b/core/liblog/log_portability.h
+@@ -17,7 +17,6 @@
+ #ifndef _LIBLOG_PORTABILITY_H__
+ #define _LIBLOG_PORTABILITY_H__
+ 
+-#include <sys/cdefs.h>
+ #include <unistd.h>
+ 
+ /* Helpful private sys/cdefs.h like definitions */

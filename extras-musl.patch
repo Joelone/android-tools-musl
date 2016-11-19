@@ -1,0 +1,42 @@
+diff --git a/extras/ext4_utils/sha1.c b/extras/ext4_utils/sha1.c
+index 463ec38..f92f418 100644
+--- a/extras/ext4_utils/sha1.c
++++ b/extras/ext4_utils/sha1.c
+@@ -18,7 +18,6 @@
+ #define SHA1HANDSOFF		/* Copies data before messing with it. */
+ 
+ #ifndef USE_MINGW
+-#include <sys/cdefs.h>
+ #endif
+ #include <sys/types.h>
+ #include <assert.h>
+diff --git a/extras/ext4_utils/sha1.h b/extras/ext4_utils/sha1.h
+index 9a8f7e3..76fd247 100644
+--- a/extras/ext4_utils/sha1.h
++++ b/extras/ext4_utils/sha1.h
+@@ -21,7 +21,6 @@ typedef unsigned int u_int;
+ #define __BEGIN_DECLS
+ #define __END_DECLS
+ #else
+-#include <sys/cdefs.h>
+ #endif
+ 
+ #define SHA1_DIGEST_LENGTH		20
+@@ -33,11 +32,15 @@ typedef struct {
+ 	u_char buffer[64];
+ } SHA1_CTX;
+ 
+-__BEGIN_DECLS
++#if defined(__cplusplus)
++extern "C" {
++#endif
+ void	SHA1Transform(uint32_t[5], const u_char[64]);
+ void	SHA1Init(SHA1_CTX *);
+ void	SHA1Update(SHA1_CTX *, const u_char *, u_int);
+ void	SHA1Final(u_char[SHA1_DIGEST_LENGTH], SHA1_CTX *);
+-__END_DECLS
++#if defined(__cplusplus)
++}
++#endif
+ 
+ #endif /* _SYS_SHA1_H_ */
